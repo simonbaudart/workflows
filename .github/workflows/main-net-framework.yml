@@ -1,0 +1,34 @@
+name: CD - Net Framework
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Determine And Set Version
+        shell: pwsh
+        run: |
+          Write-Host "TagName: ${{ github.event.release.tag_name }}"
+          $informationalVersion = ("${{ github.event.release.tag_name }}").Replace("v","")
+          if ($informationalVersion -eq "") {
+            $informationalVersion = $env:GITHUB_REF.replace('refs/tags/v', '')
+          }
+          if (($informationalVersion -eq "") -or ($informationalVersion -like "refs/*")) {
+            $informationalVersion = "0.0.0"
+          }
+          echo "VERSION_INFORMATIONAL=$informationalVersion" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
+          $assemblyVersion = $informationalVersion.Split("-")[0];
+          $assemblyVersion = $assemblyVersion + ".${{github.run_number}}"
+          $informationalVersion = $informationalVersion + ".${{github.run_number}}"
+          Write-Host "InformationalVersion: $informationalVersion"
+          Write-Host "AssemblyVersion: $assemblyVersion"
+          ((Get-Content -path "${{ github.workspace }}/src/Version.cs" -Raw) -replace '1.0.0-pre',$informationalVersion) | Set-Content -Path ${{ github.workspace }}/src/Version.cs
+          ((Get-Content -path "${{ github.workspace }}/src/Version.cs" -Raw) -replace '1.0.0',$assemblyVersion) | Set-Content -Path ${{ github.workspace }}/src/Version.cs
